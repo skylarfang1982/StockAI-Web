@@ -5,8 +5,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # 網頁基本設定
-st.set_page_config(page_title="多模型決策系統", layout="wide")
-st.title("🔮 多模型 AI 綜合決策系統")
+st.set_page_config(page_title="多模型股市決策系統", layout="wide")
+st.title("🔮 多模型 AI 股市綜合決策系統")
 st.write("本系統同時運算【趨勢、動能、波動度】三大獨立量化模型，進行交叉驗證投票。")
 
 # 網頁格子輸入元件
@@ -20,6 +20,7 @@ if st.button("啟動多模型交叉分析"):
         if df.empty:
             st.error("無法抓取該股票數據，請檢查代號是否正確。")
         else:
+            # 清洗欄位，避免新版 yfinance 多層索引問題
             df.columns = [col[0] if isinstance(col, tuple) else col for col in df.columns]
 
             # ----------------------------------------------------
@@ -81,7 +82,7 @@ if st.button("啟動多模型交叉分析"):
             buy_votes = total_votes.count(1)
             sell_votes = total_votes.count(-1)
             
-            # 計算看漲勝率機率 (簡單權重模型)
+            # 計算看漲勝率機率
             confidence_score = int((buy_votes / 3) * 100)
 
             # ----------------------------------------------------
@@ -114,19 +115,32 @@ if st.button("啟動多模型交叉分析"):
             
             with c1:
                 st.write("**1. 趨勢籌碼流 (MACD+OBV)**")
-                st.write("🟢 看多" if m1_score == 1 else "🔴 看空/轉弱")
+                if m1_score == 1:
+                    st.write("🟢 趨勢看多")
+                else:
+                    st.write("🔴 趨勢看空/轉弱")
                 
             with c2:
                 st.write("**2. 動能反轉流 (RSI+KD)**")
-                st.write("🟢 處於低檔反彈區" if m1_score == 1 else ("🔴 處於高檔過熱區" if m2_score == -1 else "🟡 訊號中立"))
+                if m2_score == 1:
+                    st.write("🟢 處於低檔反彈區")
+                elif m2_score == -1:
+                    st.write("🔴 處於高檔過熱區")
+                else:
+                    st.write("🟡 訊號中立")
                 
             with c3:
                 st.write("**3. 波動突破流 (布林通道)**")
-                st.write("🟢 帶量突破上軌 (強勢股)" if m3_score == 1 else ("🔴 跌破下軌 (弱勢格局)" if m3_score == -1 else "🟡 通道內震盪"))
+                if m3_score == 1:
+                    st.write("🟢 帶量突破上軌 (強勢股)")
+                elif m3_score == -1:
+                    st.write("🔴 跌破下軌 (弱勢格局)")
+                else:
+                    st.write("🟡 通道內震盪")
 
-st.divider()
+            st.divider()
 
-            # 🛠 使用 st.expander 隱藏圖表，點擊才展開
+            # 🛠 摺疊元件：預設不顯示圖表，點擊才展開
             with st.expander("📊 點擊查看歷史 K 線與波動度通道走勢圖 (布林通道)"):
                 fig, ax = plt.subplots(figsize=(14, 5))
                 ax.plot(df['Close'], label='收盤價', color='black', alpha=0.7)
