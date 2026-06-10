@@ -5,8 +5,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # 網頁基本設定
-st.set_page_config(page_title="量化股市決策系統", layout="centered")
-st.title("📊 AI 量化股市波段決策系統")
+st.set_page_config(page_title="量化決策系統", layout="centered")
+st.title("📊 AI量化波段決策系統")
 st.write("輸入股票代號，自動分析技術面與籌碼面，給出買賣決策建議。")
 
 # 1. 網頁格子輸入元件 (預設台積電)
