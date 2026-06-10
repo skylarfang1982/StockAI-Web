@@ -5,8 +5,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # 網頁基本設定
-st.set_page_config(page_title="AI 股市量化決策與選股系統", layout="wide")
-st.title("🔮 多模型 AI 股市綜合決策系統")
+st.set_page_config(page_title="AI 量化決策與選股系統", layout="wide")
+st.title("🔮 多模型 AI 綜合決策系統")
 
 # ----------------------------------------------------
 # 🗂 150檔核心股池 與 其所屬產業板塊 完美映射字典
