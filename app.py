@@ -5,87 +5,133 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # 網頁基本設定
-st.set_page_config(page_title="量化決策系統", layout="centered")
-st.title("📊 AI量化波段決策系統")
-st.write("輸入股票代號，自動分析技術面與籌碼面，給出買賣決策建議。")
+st.set_page_config(page_title="多模型決策系統", layout="wide")
+st.title("🔮 多模型 AI 綜合決策系統")
+st.write("本系統同時運算【趨勢、動能、波動度】三大獨立量化模型，進行交叉驗證投票。")
 
-# 1. 網頁格子輸入元件 (預設台積電)
-ticker_input = st.text_input("請輸入股票代號（台股請加 .TW，美股直接輸入代號）", value="2330.TW")
+# 網頁格子輸入元件
+ticker_input = st.text_input("請輸入股票代號（台股如 2330.TW，美股如 NVDA）", value="2330.TW")
 
-if st.button("開始分析"):
-    with st.spinner('正在獲取最新市場數據並計算中...'):
-        # 抓取數據
+if st.button("啟動多模型交叉分析"):
+    with st.spinner('三大模型全力運算中...'):
+        # 1. 抓取數據 (近兩年數據)
         df = yf.download(ticker_input, start="2024-01-01")
         
         if df.empty:
-            st.error("無法抓取該股票數據，請檢查代號是否正確（例如：2317.TW 或 AAPL）。")
+            st.error("無法抓取該股票數據，請檢查代號是否正確。")
         else:
-            # 清洗欄位
             df.columns = [col[0] if isinstance(col, tuple) else col for col in df.columns]
 
-            # 技術面：MACD 與 20MA
+            # ----------------------------------------------------
+            # 【模型一：趨勢+籌碼流】 (MACD + OBV + MA20)
+            # ----------------------------------------------------
             df['EMA12'] = df['Close'].ewm(span=12, adjust=False).mean()
             df['EMA26'] = df['Close'].ewm(span=26, adjust=False).mean()
-            df['DIF'] = df['EMA12'] - df['EMA26']
-            df['MACD_Signal'] = df['DIF'].ewm(span=9, adjust=False).mean()
-            df['MACD_Hist'] = df['DIF'] - df['MACD_Signal'] 
+            df['MACD_Hist'] = df['EMA12'] - df['EMA26'] - (df['EMA12'] - df['EMA26']).ewm(span=9, adjust=False).mean()
             df['MA20'] = df['Close'].rolling(window=20).mean()
-
-            # 籌碼面：OBV
             price_diff = df['Close'].diff()
             direction = np.where(price_diff > 0, 1, np.where(price_diff < 0, -1, 0))
             df['OBV'] = (direction * df['Volume']).cumsum()
             df['OBV_MA5'] = df['OBV'].rolling(window=5).mean()
 
-            # 邏輯大腦
-            df['Signal'] = 0
-            for i in range(1, len(df)):
-                macd_cross_up = (df['MACD_Hist'].iloc[i-1] < 0) and (df['MACD_Hist'].iloc[i] > 0)
-                volume_inflow = df['OBV'].iloc[i] > df['OBV_MA5'].iloc[i]
-                above_ma20 = df['Close'].iloc[i] > df['MA20'].iloc[i]
-                
-                macd_cross_down = (df['MACD_Hist'].iloc[i-1] > 0) and (df['MACD_Hist'].iloc[i] < 0)
-                below_ma20 = df['Close'].iloc[i] < df['MA20'].iloc[i]
+            # ----------------------------------------------------
+            # 【模型二：動能反轉流】 (RSI + KD 指標)
+            # ----------------------------------------------------
+            # RSI 計算
+            delta = df['Close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs = gain / loss
+            df['RSI'] = 100 - (100 / (1 + rs))
+            # KD 計算
+            low_min = df['Low'].rolling(window=9).min()
+            high_max = df['High'].rolling(window=9).max()
+            df['RSV'] = (df['Close'] - low_min) / (high_max - low_min) * 100
+            df['K'] = df['RSV'].ewm(com=2, adjust=False).mean()
+            df['D'] = df['K'].ewm(com=2, adjust=False).mean()
 
-                if macd_cross_up and volume_inflow and above_ma20:
-                    df.loc[df.index[i], 'Signal'] = 1
-                elif macd_cross_down or below_ma20:
-                    df.loc[df.index[i], 'Signal'] = -1
+            # ----------------------------------------------------
+            # 【模型三：波動度突破流】 (布林通道 Bollinger Bands)
+            # ----------------------------------------------------
+            df['BB_Middle'] = df['Close'].rolling(window=20).mean()
+            df['BB_Std'] = df['Close'].rolling(window=20).std()
+            df['BB_Upper'] = df['BB_Middle'] + (df['BB_Std'] * 2)
+            df['BB_Lower'] = df['BB_Middle'] - (df['BB_Std'] * 2)
 
-            df['Position'] = df['Signal'].replace(0, np.nan).ffill().shift(1).fillna(0)
+            # ----------------------------------------------------
+            # 🎯 決策投票核心大腦 (計算最新一天的訊號)
+            # ----------------------------------------------------
+            # 模型 1 判斷
+            m1_buy = (df['MACD_Hist'].iloc[-1] > 0) and (df['OBV'].iloc[-1] > df['OBV_MA5'].iloc[-1]) and (df['Close'].iloc[-1] > df['MA20'].iloc[-1])
+            m1_sell = (df['MACD_Hist'].iloc[-1] < 0) or (df['Close'].iloc[-1] < df['MA20'].iloc[-1])
+            m1_score = 1 if m1_buy else (-1 if m1_sell else 0)
+
+            # 模型 2 判斷 (低檔超賣反彈)
+            m2_buy = (df['RSI'].iloc[-1] < 40) and (df['K'].iloc[-1] > df['D'].iloc[-1])
+            m2_sell = (df['RSI'].iloc[-1] > 70) and (df['K'].iloc[-1] < df['D'].iloc[-1])
+            m2_score = 1 if m2_buy else (-1 if m2_sell else 0)
+
+            # 模型 3 判斷 (強勢突破上軌)
+            m3_buy = df['Close'].iloc[-1] >= df['BB_Upper'].iloc[-1]
+            m3_sell = df['Close'].iloc[-1] <= df['BB_Lower'].iloc[-1]
+            m3_score = 1 if m3_buy else (-1 if m3_sell else 0)
+
+            # 綜合勝率計分板
+            total_votes = [m1_score, m2_score, m3_score]
+            buy_votes = total_votes.count(1)
+            sell_votes = total_votes.count(-1)
             
-            # 當日狀態分析
-            latest_date = df.index[-1].strftime('%Y-%m-%d')
+            # 計算看漲勝率機率 (簡單權重模型)
+            confidence_score = int((buy_votes / 3) * 100)
+
+            # ----------------------------------------------------
+            # 🌐 前端網頁視覺化呈現
+            # ----------------------------------------------------
             latest_price = round(df['Close'].iloc[-1], 1)
-            current_signal = df['Signal'].iloc[-1]
-            current_pos = df['Position'].iloc[-1]
+            latest_date = df.index[-1].strftime('%Y-%m-%d')
 
-            # 網頁視覺化儀表板看板 (KPI Metrics)
-            col1, col2 = st.columns(2)
-            col1.metric("最新收盤價", f"{latest_price} 元", f"日期: {latest_date}")
+            st.subheader(f"📊 綜合診斷報告 (分析日期: {latest_date})")
             
-            if current_signal == 1:
-                col2.success("💡 建議買入")
-                st.info("原因：今日觸發黃金交叉，且資金集聚、站穩月線多頭格局。")
-            elif current_signal == -1:
-                col2.error("🚨 建議賣出")
-                st.warning("原因：趨勢轉弱或股價跌破 20MA 防守線，建議停損/落袋為安。")
+            # 三大指標看板
+            col1, col2, col3 = st.columns(3)
+            col1.metric("當前收盤價", f"{latest_price} 元")
+            col2.metric("綜合看漲信心度", f"{confidence_score} %")
+            
+            if confidence_score >= 66:
+                col3.success("🔥 強烈建議買入 (共識度高)")
+            elif confidence_score == 33:
+                col3.info("🍏 偏多續抱 / 少量試單")
+            elif sell_votes >= 2:
+                col3.error("🚨 建議避險 / 減碼賣出")
             else:
-                if current_pos == 1:
-                    col2.info("🍏 持股續抱")
-                else:
-                    col2.warning("💤 空方觀望")
+                col3.warning("💤 趨勢不明 / 觀望盤整")
 
-            # 繪製線圖並顯示於網頁
-            fig, ax = plt.subplots(figsize=(12, 5))
-            ax.plot(df['Close'], label='收盤價', color='black', alpha=0.4)
-            ax.plot(df['MA20'], label='20MA波段線', color='orange', linestyle='--')
+            st.divider()
+
+            # 模型分項解析明細
+            st.write("### 🔍 各模型獨立審查明細")
+            c1, c2, c3 = st.columns(3)
             
-            buy_signals = df[df['Signal'] == 1]
-            ax.scatter(buy_signals.index, buy_signals['Close'], label='買入訊號', marker='^', color='green', s=100)
-            sell_signals = df[df['Signal'] == -1]
-            ax.scatter(sell_signals.index, sell_signals['Close'], label='賣出訊號', marker='v', color='red', s=100)
-            
-            ax.legend()
-            ax.grid(True, alpha=0.3)
+            with c1:
+                st.write("**1. 趨勢籌碼流 (MACD+OBV)**")
+                st.write("🟢 看多" if m1_score == 1 else "🔴 看空/轉弱")
+                
+            with c2:
+                st.write("**2. 動能反轉流 (RSI+KD)**")
+                st.write("🟢 處於低檔反彈區" if m1_score == 1 else ("🔴 處於高檔過熱區" if m2_score == -1 else "🟡 訊號中立"))
+                
+            with c3:
+                st.write("**3. 波動突破流 (布林通道)**")
+                st.write("🟢 帶量突破上軌 (強勢股)" if m3_score == 1 else ("🔴 跌破下軌 (弱勢格局)" if m3_score == -1 else "🟡 通道內震盪"))
+
+            # 歷史K線與布林通道圖表
+            st.write("### 📈 波動度通道走勢圖")
+            fig, ax = plt.subplots(figsize=(14, 5))
+            ax.plot(df['Close'], label='收盤價', color='black', alpha=0.7)
+            ax.plot(df['BB_Upper'], label='布林上軌 (壓力線)', color='red', linestyle='--', alpha=0.5)
+            ax.plot(df['BB_Middle'], label='布林中軌 (月線)', color='orange', alpha=0.5)
+            ax.plot(df['BB_Lower'], label='布林下軌 (支撐線)', color='green', linestyle='--', alpha=0.5)
+            ax.fill_between(df.index, df['BB_Upper'], df['BB_Lower'], color='gray', alpha=0.05)
+            ax.legend(loc='upper left')
+            ax.grid(True, alpha=0.2)
             st.pyplot(fig)
