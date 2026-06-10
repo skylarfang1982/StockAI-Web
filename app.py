@@ -114,10 +114,21 @@ def calculate_signals(df):
     positive_signals = [1 for s in [m1_score, m2_score, m3_score] if s == 1]
     confidence_score = int((len(positive_signals) / 3) * 100)
     
+    # 🎯 【防錯升級邏輯】
+    latest_close = df['Close'].iloc[-1]
     recent_low = df['Low'].iloc[-20:].min()
     recent_high = df['High'].iloc[-20:].max()
-    best_buy = round((recent_low + df['BB_Lower'].iloc[-1]) / 2, 1)
-    best_sell = round((recent_high + df['BB_Upper'].iloc[-1]) / 2, 1)
+    
+    # 最佳買點：如果是強勢股，回檔到 MA20 或布林中線附近就是好買點，若跌破近期最低則防守
+    best_buy = round(max(df['MA20'].iloc[-1], recent_low), 1)
+    # 最佳賣點：動態向外推，必須高於當前收盤價與近期最高價，採用 1.1 倍或布林上軌最大值
+    best_sell = round(max(latest_close * 1.08, recent_high, df['BB_Upper'].iloc[-1]), 1)
+    
+    # 防呆確認：確保買點一定低於現價，賣點一定高於現價
+    if best_buy >= latest_close:
+        best_buy = round(latest_close * 0.93, 1)
+    if best_sell <= latest_close:
+        best_sell = round(latest_close * 1.10, 1)
     
     return confidence_score, best_buy, best_sell, m1_score, m2_score, m3_score, df
 
@@ -126,30 +137,24 @@ def calculate_signals(df):
 # ----------------------------------------------------
 tab1, tab2 = st.tabs(["🔍 個股策略診斷", "🚀 全台股整體產業金流與強勢股雷達"])
 
-# ===== Tab 1: 個股診斷功能 (🎯 雙階段按鈕觸發圖表) =====
+# ===== Tab 1: 個股診斷功能 =====
 with tab1:
     st.write("輸入特定股票代號，查看最完整的量化指標明細與動態買賣操作指引。")
-    
     ticker_input = st.text_input("請輸入股票代號（台股如：2330.TW、2603.TW）", value="2330.TW")
     
-    # 建立兩個按鈕並排的空間
     btn_col1, btn_col2 = st.columns([1, 4])
-    
     with btn_col1:
         run_analysis = st.button("啟動個股分析")
     
-    # 🎯 初始化用於控制「是否顯示圖表」的狀態開關
     if "show_chart" not in st.session_state:
         st.session_state.show_chart = False
     if "current_ticker" not in st.session_state:
         st.session_state.current_ticker = ""
 
-    # 如果使用者更換了股票代號，自動把圖表收起來，直到再次點擊
     if ticker_input != st.session_state.current_ticker:
         st.session_state.show_chart = False
         st.session_state.current_ticker = ticker_input
 
-    # 當按下主分析鈕，執行量化運算並把數據存入暫存，同時隱藏圖表
     if run_analysis:
         if not ticker_input:
             st.warning("請先輸入股票代號。")
@@ -159,7 +164,6 @@ with tab1:
                 if df.empty:
                     st.error("無法抓取該股票數據。")
                 else:
-                    # 將計算結果暫存在 session_state 中，避免網頁刷新時資料不見
                     score, buy_p, sell_p, m1, m2, m3, processed_df = calculate_signals(df)
                     st.session_state.analysis_data = {
                         "score": score, "buy_p": buy_p, "sell_p": sell_p,
@@ -167,10 +171,8 @@ with tab1:
                         "latest_date": processed_df.index[-1].strftime('%Y-%m-%d'),
                         "chart_df": processed_df.tail(65)
                     }
-                    # 預設此時圖表仍不顯示
                     st.session_state.show_chart = False
 
-    # 顯示暫存的分析數據
     if "analysis_data" in st.session_state:
         data = st.session_state.analysis_data
         
@@ -201,7 +203,6 @@ with tab1:
 
         st.divider()
         
-        # 🎯 核心設計：放上第二個專門用來控制圖表開關的按鈕
         if st.session_state.show_chart:
             if st.button("👁️ 隱藏技術對照圖表"):
                 st.session_state.show_chart = False
@@ -211,7 +212,6 @@ with tab1:
                 st.session_state.show_chart = True
                 st.rerun()
 
-        # 🎯 如果狀態為真，才動態渲染 Matplotlib 圖表
         if st.session_state.show_chart:
             chart_df = data["chart_df"]
             buy_p = data["buy_p"]
@@ -221,11 +221,9 @@ with tab1:
             plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei', 'Arial Unicode MS', 'sans-serif']
             plt.rcParams['axes.unicode_minus'] = False
             
-            # 畫出收盤價與MA20
             ax.plot(chart_df.index, chart_df['Close'], label='當日收盤價', color='#1f77b4', linewidth=2)
             ax.plot(chart_df.index, chart_df['MA20'], label='20日生命線 (MA20)', color='#ff7f0e', linestyle='--')
             
-            # 動態打上買點、賣點的水平虛線
             ax.axhline(y=buy_p, color='green', linestyle=':', linewidth=1.5, label=f'最佳分批買點 ({buy_p}元)')
             ax.axhline(y=sell_p, color='red', linestyle=':', linewidth=1.5, label=f'最佳波段賣點 ({sell_p}元)')
             
@@ -251,7 +249,8 @@ with tab2:
         status_text = st.empty()
         status_text.write("正在批量下載並運算 150 檔大中型核心股量化指標...")
         
-        all_stock_data = yf.download(stock_pool, period="3mo", group_by='ticker')
+        # 🎯 這裡同步將選股下載長度拉長到 1 年 (1y)，避免短週期指標失真
+        all_stock_data = yf.download(stock_pool, period="1y", group_by='ticker')
         
         for idx, ticker in enumerate(stock_pool):
             progress_bar.progress((idx + 1) / len(stock_pool))
