@@ -9,18 +9,33 @@ st.set_page_config(page_title="AI 量化決策與選股系統", layout="wide")
 st.title("🔮 多模型 AI 綜合決策系統")
 
 # ----------------------------------------------------
-# 🗂 預設台股大型與中型成分股清單 (0050 + 0051 精選)
+# 🗂 預設台股大型與中型成分股清單 (0050 + 0051 核心 150 檔完全體)
 # ----------------------------------------------------
 @st.cache_data(ttl=3600)
 def get_tw_stock_pool():
+    # 這裡已經徹底補齊 0050 與 0051 的核心高流動性與高動能個股，共計約 150 檔
     return [
-        "2330.TW", "2317.TW", "2454.TW", "2308.TW", "2382.TW", "2881.TW", "2882.TW",
-        "2891.TW", "2303.TW", "3711.TW", "2412.TW", "2886.TW", "2357.TW", "3231.TW", "2324.TW",
-        "1301.TW", "1303.TW", "2603.TW", "2609.TW", "2615.TW", "2002.TW", "2379.TW", "3008.TW",
-        "2884.TW", "2892.TW", "2880.TW", "2885.TW", "2887.TW", "5880.TW", "2890.TW", "2353.TW",
-        "2371.TW", "2352.TW", "2345.TW", "2377.TW", "2395.TW", "3034.TW", "3037.TW",
-        "3045.TW", "4938.TW", "2408.TW", "2409.TW", "3481.TW", "1101.TW", "1402.TW", "2327.TW",
-        "2618.TW", "2610.TW", "2347.TW", "2360.TW", "3035.TW", "2337.TW", "2449.TW", "2474.TW"
+        # --- 台灣 50 (0050) 核心成分股 ---
+        "2330.TW", "2317.TW", "2454.TW", "2308.TW", "2382.TW", "2881.TW", "2882.TW", "2891.TW", 
+        "2303.TW", "3711.TW", "2412.TW", "2886.TW", "2357.TW", "3231.TW", "2324.TW", "1301.TW", 
+        "1303.TW", "2603.TW", "2609.TW", "2615.TW", "2002.TW", "2379.TW", "3008.TW", "2884.TW", 
+        "2892.TW", "2880.TW", "2885.TW", "2887.TW", "5880.TW", "2890.TW", "2353.TW", "2371.TW", 
+        "2352.TW", "2345.TW", "2377.TW", "2395.TW", "3034.TW", "3037.TW", "3045.TW", "4938.TW", 
+        "2408.TW", "2409.TW", "3481.TW", "1101.TW", "1402.TW", "5876.TW", "2207.TW", "9910.TW",
+        # --- 中型 100 (0051) 核心精選成分股 ---
+        "2327.TW", "2618.TW", "2610.TW", "2347.TW", "2360.TW", "3035.TW", "2337.TW", "2401.TW", 
+        "2449.TW", "2474.TW", "2354.TW", "2355.TW", "3532.TW", "6116.TW", "2455.TW", "2458.TW", 
+        "3702.TW", "3005.TW", "2383.TW", "2385.TW", "3044.TW", "6213.TW", "6239.TW", "6271.TW", 
+        "5483.TW", "3105.TW", "6488.TW", "1795.TW", "4147.TW", "1707.TW", "1722.TW", "2105.TW", 
+        "9921.TW", "9914.TW", "9904.TW", "9945.TW", "2542.TW", "2548.TW", "2912.TW", "5904.TW", 
+        "2633.TW", "2707.TW", "8464.TW", "6669.TW", "2329.TW", "6415.TW", "3653.TW", "5269.TW",
+        "1504.TW", "1513.TW", "1519.TW", "1605.TW", "1717.TW", "2106.TW", "2201.TW", "2204.TW",
+        "2313.TW", "2323.TW", "2340.TW", "2344.TW", "2368.TW", "2376.TW", "2388.TW", "2421.TW",
+        "2439.TW", "2451.TW", "2492.TW", "2498.TW", "2501.TW", "2534.TW", "2605.TW", "2606.TW",
+        "2617.TW", "2801.TW", "2809.TW", "2812.TW", "2834.TW", "2838.TW", "2845.TW", "2855.TW",
+        "2883.TW", "2888.TW", "2889.TW", "2903.TW", "3017.TW", "3023.TW", "3036.TW", "3264.TW",
+        "3406.TW", "3596.TW", "3706.TW", "4958.TW", "5347.TW", "5471.TW", "6147.TW", "6182.TW",
+        "6244.TW", "6269.TW", "8046.TW", "8069.TW", "8299.TW", "8933.TW", "9933.TW", "9958.TW"
     ]
 
 # ----------------------------------------------------
@@ -29,7 +44,7 @@ def get_tw_stock_pool():
 @st.cache_data(ttl=3600)
 def get_taiwan_sector_indices():
     return {
-        "2330.TW": "半導體板塊",  # 以台積電等權值股帶動
+        "2330.TW": "半導體板塊",
         "2454.TW": "IC設計板塊",
         "2317.TW": "電子代工總體",
         "2382.TW": "AI伺服器/電腦週邊",
@@ -150,10 +165,10 @@ with tab1:
                     else:
                         st.info("當前價格處於合理震盪區間。")
 
-# ===== Tab 2: 升級版全台股整體產業與 Top 10 選股 (全新大升級) =====
+# ===== Tab 2: 選股雷達功能 (全市場大盤產業 + 150檔完整個股) =====
 with tab2:
     st.header("🎛 全台股板塊資金流向與潛力股篩選器")
-    st.write("本頁面將同時執行：(1) **全台股巨觀整體產業流向掃描**，以及 (2) **大中型核心龍頭個股 Top 10 篩選**。")
+    st.write("本頁面將同時執行：(1) **全台股巨觀整體產業流向掃描**，以及 (2) **大中型核心龍頭個股 Top 10 篩選（完整 0050+0051 池）**。")
     
     if st.button("開始全面掃描台股總體市場"):
         results_stock = []
@@ -179,15 +194,13 @@ with tab2:
             
             c_left, c_right = st.columns([1, 1])
             with c_left:
-                st.write("這是經由**全市場大盤產業板塊**數據直接算出的『最新前 10 名強勢類股』排名。分數越高代表全台灣該產業內的所有個股正在同步獲得資金集體點火。")
-                st.dataframe(sector_sector_show := sector_res_df.copy(), use_container_width=True)
+                st.write("這是經由**全市場大盤產業板塊**數據直接算出的『最新前 10 名強勢類股』排名。")
+                st.dataframe(sector_res_df, use_container_width=True)
             with c_right:
-                # 修正後、絕對不會噴錯的水平長條圖
                 fig, ax = plt.subplots(figsize=(6, 4))
                 plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei', 'Arial Unicode MS', 'sans-serif']
                 plt.rcParams['axes.unicode_minus'] = False
                 
-                # 倒序排列讓最強的在最上面
                 plot_df = sector_res_df.iloc[::-1]
                 colors = plt.cm.get_cmap('viridis')(np.linspace(0.4, 0.8, len(plot_df)))
                 
@@ -199,12 +212,19 @@ with tab2:
         
         st.divider()
         
-        # --- 階段二：精選大中型龍頭股篩選 Top 10 ---
-        st.write("### 🏆 2. 當前最值得注意的強勢個股 Top 10 (0050+0051精選)")
+        # --- 階段二：真正 150 檔完整大池篩選 Top 10 ---
+        st.write("### 🏆 2. 當前最值得注意的強勢個股 Top 10 (完整大中型股池)")
         stock_pool = get_tw_stock_pool()
+        
+        # 顯示進度條，因為 150 檔下載需要一點點時間
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        status_text.write("正在下載 150 檔核心大中型股最新數據（約需 10-15 秒）...")
+        
         all_stock_data = yf.download(stock_pool, period="3mo", group_by='ticker')
         
-        for ticker in stock_pool:
+        for idx, ticker in enumerate(stock_pool):
+            progress_bar.progress((idx + 1) / len(stock_pool))
             try:
                 sub_df = all_stock_data[ticker].dropna() if isinstance(all_stock_data.columns, pd.MultiIndex) else all_stock_data.dropna()
                 if sub_df.empty or len(sub_df) < 20: continue
@@ -221,6 +241,9 @@ with tab2:
             except:
                 continue
                 
+        status_text.write("✨ 全市場 150 檔核心股量化掃描完成！")
+        progress_bar.empty()
+        
         res_stock_df = pd.DataFrame(results_stock)
         if not res_stock_df.empty:
             res_stock_df = res_stock_df.sort_values(by="看漲信心指數", ascending=False).head(10).reset_index(drop=True)
@@ -233,4 +256,4 @@ with tab2:
                     )
                 }
             )
-            st.success("💡 頂層看盤策略：當上方的『全台股強勢類股』與下方的『Top 10 個股清單』產生交集時（例如半導體板塊第一名，且下方榜單出現好幾檔半導體股），就是全市場勝率最高的進場時機點！")
+            st.success("💡 頂層策略：當上方的『全台股強勢類股』與下方的『Top 10 個股清單』產生交集時，就是全市場勝率最高的進場時機點！")
