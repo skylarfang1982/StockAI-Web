@@ -68,7 +68,6 @@ def calculate_signals(df):
     if df.empty or len(df) < 20:
         return 0, 0, 0, 0, 0, 0, None
     
-    # 確保 columns 名稱乾淨（防止 yfinance 回傳多重索引）
     df.columns = [col[0] if isinstance(col, tuple) else col for col in df.columns]
 
     # 1. 趨勢籌碼 (MACD + OBV + MA20)
@@ -127,61 +126,121 @@ def calculate_signals(df):
 # ----------------------------------------------------
 tab1, tab2 = st.tabs(["🔍 個股策略診斷", "🚀 全台股整體產業金流與強勢股雷達"])
 
-# ===== Tab 1: 個股診斷功能 (已完美補回技術圖表) =====
+# ===== Tab 1: 個股診斷功能 (🎯 雙階段按鈕觸發圖表) =====
 with tab1:
     st.write("輸入特定股票代號，查看最完整的量化指標明細與動態買賣操作指引。")
-    ticker_input = st.text_input("請輸入股票代號（台股如 2330.TW）", value="2330.TW", key="single_search")
     
-    if st.button("啟動個股分析"):
-        with st.spinner('數據計算中...'):
-            df = yf.download(ticker_input, start="2024-01-01")
-            if df.empty:
-                st.error("無法抓取該股票數據。")
-            else:
-                score, buy_p, sell_p, m1, m2, m3, processed_df = calculate_signals(df)
-                latest_price = round(processed_df['Close'].iloc[-1], 1)
-                latest_date = processed_df.index[-1].strftime('%Y-%m-%d')
-                
-                st.subheader(f"📊 綜合診斷報告 (分析日期: {latest_date})")
-                col1, col2, col3 = st.columns(3)
-                col1.metric("當前收盤價", f"{latest_price} 元")
-                col2.metric("綜合看漲信心度", f"{score} %")
-                if score >= 66:
-                    col3.success("🔥 強烈建議買入")
-                elif score == 33:
-                    col3.info("🍏 偏多續抱 / 少量試單")
+    ticker_input = st.text_input("請輸入股票代號（台股如：2330.TW、2603.TW）", value="2330.TW")
+    
+    # 建立兩個按鈕並排的空間
+    btn_col1, btn_col2 = st.columns([1, 4])
+    
+    with btn_col1:
+        run_analysis = st.button("啟動個股分析")
+    
+    # 🎯 初始化用於控制「是否顯示圖表」的狀態開關
+    if "show_chart" not in st.session_state:
+        st.session_state.show_chart = False
+    if "current_ticker" not in st.session_state:
+        st.session_state.current_ticker = ""
+
+    # 如果使用者更換了股票代號，自動把圖表收起來，直到再次點擊
+    if ticker_input != st.session_state.current_ticker:
+        st.session_state.show_chart = False
+        st.session_state.current_ticker = ticker_input
+
+    # 當按下主分析鈕，執行量化運算並把數據存入暫存，同時隱藏圖表
+    if run_analysis:
+        if not ticker_input:
+            st.warning("請先輸入股票代號。")
+        else:
+            with st.spinner('數據計算中...'):
+                df = yf.download(ticker_input, start="2024-01-01")
+                if df.empty:
+                    st.error("無法抓取該股票數據。")
                 else:
-                    col3.warning("💤 趨勢不明 / 觀望盤整")
+                    # 將計算結果暫存在 session_state 中，避免網頁刷新時資料不見
+                    score, buy_p, sell_p, m1, m2, m3, processed_df = calculate_signals(df)
+                    st.session_state.analysis_data = {
+                        "score": score, "buy_p": buy_p, "sell_p": sell_p,
+                        "latest_price": round(processed_df['Close'].iloc[-1], 1),
+                        "latest_date": processed_df.index[-1].strftime('%Y-%m-%d'),
+                        "chart_df": processed_df.tail(65)
+                    }
+                    # 預設此時圖表仍不顯示
+                    st.session_state.show_chart = False
 
-                st.divider()
-                st.write("### 🎯 現階段最佳動態策略價位估算")
-                buy_col, sell_col, action_col = st.columns(3)
-                buy_col.metric("🟢 最佳分批買點 (強支撐)", f"{buy_p} 元")
-                sell_col.metric("🔴 最佳波段賣點 (強壓力)", f"{sell_p} 元")
-                with action_col:
-                    if latest_price <= buy_p * 1.02:
-                        st.success("✨ 股價接近最佳買點，適合逢低佈局！")
-                    elif latest_price >= sell_p * 0.98:
-                        st.error("⚠️ 股價逼近最佳賣點，請勿追高！")
-                    else:
-                        st.info("當前價格處於合理震盪區間。")
+    # 顯示暫存的分析數據
+    if "analysis_data" in st.session_state:
+        data = st.session_state.analysis_data
+        
+        st.subheader(f"📊 綜合診斷報告 (分析日期: {data['latest_date']})")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("當前收盤價", f"{data['latest_price']} 元")
+        col2.metric("綜合看漲信心度", f"{data['score']} %")
+        if data['score'] >= 66:
+            col3.success("🔥 強烈建議買入")
+        elif data['score'] == 33:
+            col3.info("🍏 偏多續抱 / 少量試單")
+        else:
+            col3.warning("💤 趨勢不明 / 觀望盤整")
 
-                # 📉 🎯 【核心修復】重新繪製並補回個股近 3 個月的走勢圖與均線
-                st.divider()
-                st.write("### 📉 該股近期價格與 20 日生命線（MA20）趨勢圖")
-                chart_df = processed_df.tail(65)  # 僅抓取近約一季(65個交易日)的數據，畫面最清晰
-                
-                # 建立一個只包含收盤價與月線的 DataFrame 給 Streamlit 畫圖
-                display_chart_data = pd.DataFrame({
-                    "當日收盤價 (Close)": chart_df["Close"],
-                    "20日生命線 (MA20)": chart_df["MA20"]
-                })
-                st.line_chart(display_chart_data, height=350)
+        st.divider()
+        st.write("### 🎯 現階段最佳動態策略價位估算")
+        buy_col, sell_col, action_col = st.columns(3)
+        buy_col.metric("🟢 最佳分批買點 (強支撐)", f"{data['buy_p']} 元")
+        sell_col.metric("🔴 最佳波段賣點 (強壓力)", f"{data['sell_p']} 元")
+        
+        with action_col:
+            if data['latest_price'] <= data['buy_p'] * 1.02:
+                st.success("✨ 股價接近最佳買點，適合逢低佈局！")
+            elif data['latest_price'] >= data['sell_p'] * 0.98:
+                st.error("⚠️ 股價逼近最佳賣點，請勿追高！")
+            else:
+                st.info("當前價格處於合理震盪區間。")
 
-# ===== Tab 2: 選股雷達功能 (150檔群組化數據混合分析) =====
+        st.divider()
+        
+        # 🎯 核心設計：放上第二個專門用來控制圖表開關的按鈕
+        if st.session_state.show_chart:
+            if st.button("👁️ 隱藏技術對照圖表"):
+                st.session_state.show_chart = False
+                st.rerun()
+        else:
+            if st.button("📊 顯示量化買賣對照圖表"):
+                st.session_state.show_chart = True
+                st.rerun()
+
+        # 🎯 如果狀態為真，才動態渲染 Matplotlib 圖表
+        if st.session_state.show_chart:
+            chart_df = data["chart_df"]
+            buy_p = data["buy_p"]
+            sell_p = data["sell_p"]
+            
+            fig, ax = plt.subplots(figsize=(10, 4))
+            plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei', 'Arial Unicode MS', 'sans-serif']
+            plt.rcParams['axes.unicode_minus'] = False
+            
+            # 畫出收盤價與MA20
+            ax.plot(chart_df.index, chart_df['Close'], label='當日收盤價', color='#1f77b4', linewidth=2)
+            ax.plot(chart_df.index, chart_df['MA20'], label='20日生命線 (MA20)', color='#ff7f0e', linestyle='--')
+            
+            # 動態打上買點、賣點的水平虛線
+            ax.axhline(y=buy_p, color='green', linestyle=':', linewidth=1.5, label=f'最佳分批買點 ({buy_p}元)')
+            ax.axhline(y=sell_p, color='red', linestyle=':', linewidth=1.5, label=f'最佳波段賣點 ({sell_p}元)')
+            
+            ax.set_title(f"{ticker_input} 技術趨勢與量化買賣點對照", fontsize=11, fontweight='bold')
+            ax.set_xlabel("日期")
+            ax.set_ylabel("價格 (元)")
+            ax.legend(loc='upper left')
+            ax.grid(True, linestyle=':', alpha=0.6)
+            
+            st.pyplot(fig)
+
+# ===== Tab 2: 選股雷達功能 =====
 with tab2:
     st.header("🎛 150大中型核心股池群組化 - 產業資金流向選股器")
-    st.write("本頁面採用**混合大數據邏輯**：下載 150 檔成分股後，(1) 自動按行業分類計算**整體板塊資金強度**，(2) 篩選出**看漲信心最強的 Top 10 個股**。")
+    st.write("本頁面採用**混合大數據邏輯**：下載 150 檔成分股後，自動按行業分類計算並顯示數據報表。")
     
     if st.button("開始全面掃描 150 檔核心市場"):
         stock_mapping = get_stock_sector_mapping()
@@ -213,7 +272,7 @@ with tab2:
             except:
                 continue
                 
-        status_text.write("✨ 數據抓取完畢，正在進行巨觀產業群組運算...")
+        status_text.write("✨ 數據抓取完畢，正在進行辨識與群組排序...")
         progress_bar.empty()
         
         main_df = pd.DataFrame(results_stock)
@@ -222,25 +281,9 @@ with tab2:
             st.write("### 📊 1. 150檔核心股池混合計算：整體產業板塊資金強度")
             sector_summary = main_df.groupby("所屬板塊")["看漲信心指數"].mean().reset_index()
             sector_summary = sector_summary.sort_values(by="看漲信心指數", ascending=False).reset_index(drop=True)
-            sector_summary["板塊資金引燃強度"] = sector_summary["看漲信心指數"].round(1)
+            sector_summary["板塊資金引燃強度 (%)"] = sector_summary["看漲信心指數"].round(1)
             
-            c_left, c_right = st.columns([1, 1])
-            with c_left:
-                st.dataframe(sector_summary[["所屬板塊", "板塊資金引燃強度"]], use_container_width=True)
-                
-            with c_right:
-                fig, ax = plt.subplots(figsize=(6, 4))
-                plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei', 'Arial Unicode MS', 'sans-serif']
-                plt.rcParams['axes.unicode_minus'] = False
-                
-                plot_df = sector_summary.sort_values(by="板塊資金引燃強度", ascending=True)
-                colors = plt.cm.get_cmap('viridis')(np.linspace(0.3, 0.8, len(plot_df)))
-                
-                ax.barh(plot_df["所屬板塊"], plot_df["板塊資金引燃強度"], color=colors, height=0.6)
-                ax.set_xlabel("產業成分股平均多頭強度 (%)")
-                ax.set_title("🔥 150檔核心股混合運算：台股產業金流排行榜")
-                ax.grid(axis='x', linestyle=':', alpha=0.6)
-                st.pyplot(fig)
+            st.dataframe(sector_summary[["所屬板塊", "板塊資金引燃強度 (%)"]], use_container_width=True)
             
             st.divider()
             st.write("### 🏆 2. 當前最具動能之強勢個股 Top 10 (由 150 檔核心大池篩選)")
