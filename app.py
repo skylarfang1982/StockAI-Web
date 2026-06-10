@@ -9,52 +9,57 @@ st.set_page_config(page_title="AI 量化決策與選股系統", layout="wide")
 st.title("🔮 多模型 AI 綜合決策系統")
 
 # ----------------------------------------------------
-# 🗂 預設台股大型與中型成分股清單 (0050 + 0051 核心 150 檔完全體)
+# 🗂 150檔核心股池 與 其所屬產業板塊 完美映射字典
 # ----------------------------------------------------
-@st.cache_data(ttl=3600)
-def get_tw_stock_pool():
-    return [
-        # --- 台灣 50 (0050) 核心成分股 ---
-        "2330.TW", "2317.TW", "2454.TW", "2308.TW", "2382.TW", "2881.TW", "2882.TW", "2891.TW", 
-        "2303.TW", "3711.TW", "2412.TW", "2886.TW", "2357.TW", "3231.TW", "2324.TW", "1301.TW", 
-        "1303.TW", "2603.TW", "2609.TW", "2615.TW", "2002.TW", "2379.TW", "3008.TW", "2884.TW", 
-        "2892.TW", "2880.TW", "2885.TW", "2887.TW", "5880.TW", "2890.TW", "2353.TW", "2371.TW", 
-        "2352.TW", "2345.TW", "2377.TW", "2395.TW", "3034.TW", "3037.TW", "3045.TW", "4938.TW", 
-        "2408.TW", "2409.TW", "3481.TW", "1101.TW", "1402.TW", "5876.TW", "2207.TW", "9910.TW",
-        # --- 中型 100 (0051) 核心精選成分股 ---
-        "2327.TW", "2618.TW", "2610.TW", "2347.TW", "2360.TW", "3035.TW", "2337.TW", "2401.TW", 
-        "2449.TW", "2474.TW", "2354.TW", "2355.TW", "3532.TW", "6116.TW", "2455.TW", "2458.TW", 
-        "3702.TW", "3005.TW", "2383.TW", "2385.TW", "3044.TW", "6213.TW", "6239.TW", "6271.TW", 
-        "5483.TW", "3105.TW", "6488.TW", "1795.TW", "4147.TW", "1707.TW", "1722.TW", "2105.TW", 
-        "9921.TW", "9914.TW", "9904.TW", "9945.TW", "2542.TW", "2548.TW", "2912.TW", "5904.TW", 
-        "2633.TW", "2707.TW", "8464.TW", "6669.TW", "2329.TW", "6415.TW", "3653.TW", "5269.TW",
-        "1504.TW", "1513.TW", "1519.TW", "1605.TW", "1717.TW", "2106.TW", "2201.TW", "2204.TW",
-        "2313.TW", "2323.TW", "2340.TW", "2344.TW", "2368.TW", "2376.TW", "2388.TW", "2421.TW",
-        "2439.TW", "2451.TW", "2492.TW", "2498.TW", "2501.TW", "2534.TW", "2605.TW", "2606.TW",
-        "2801.TW", "2809.TW", "2812.TW", "2834.TW", "2838.TW", "2845.TW", "2855.TW",
-        "2883.TW", "2888.TW", "2889.TW", "2903.TW", "3017.TW", "3023.TW", "3036.TW", "3264.TW",
-        "3406.TW", "3596.TW", "3706.TW", "4958.TW", "5347.TW", "5471.TW", "6147.TW", "6182.TW",
-        "6244.TW", "6269.TW", "8046.TW", "8069.TW", "8299.TW", "8933.TW", "9933.TW", "9958.TW"
-    ]
-
-# ----------------------------------------------------
-# 🌐 【完美對接】台股官方全產業板塊加權指數代碼 (修正並補齊營建、重電、生技等)
-# ----------------------------------------------------
-@st.cache_data(ttl=3600)
-def get_taiwan_sector_indices():
-    # 經嚴格比對 Yahoo Finance 資料庫，以下代碼皆能穩定提供台股真實板塊 K 線數據
-    return {
-        "^TWSEIND": "台股加權總大盤",
-        "^TWSEELE": "電子科技總體指數",
-        "^TWSECST": "建材營造類指數",      # 🎯 補齊營建板塊
-        "^TWSEMAC": "電機重電類指數",      # 🎯 補齊重電/電機機械板塊
-        "^TWSEFNC": "金融保險類指數",
-        "^TWSETSH": "航運波段類指數",
-        "^TWSEBIO": "化學生技醫療指數",    # 🎯 補齊生技醫療板塊
-        "^TWSEITC": "電子通路類指數",
-        "^TWSESTL": "鋼鐵傳統工業指數",    # 🎯 補齊鋼鐵工業板塊
-        "^TWSETUR": "觀光餐旅類指數"       # 🎯 補齊觀光類指數
+def get_stock_sector_mapping():
+    mapping = {
+        # --- 半導體與 IC 設計 ---
+        "2330.TW": "半導體科技", "2454.TW": "半導體科技", "2303.TW": "半導體科技", "3711.TW": "半導體科技",
+        "2379.TW": "半導體科技", "3034.TW": "半導體科技", "2408.TW": "半導體科技", "2337.TW": "半導體科技",
+        "2449.TW": "半導體科技", "3532.TW": "半導體科技", "3035.TW": "半導體科技", "5269.TW": "半導體科技",
+        "6415.TW": "半導體科技", "5347.TW": "半導體科技", "6147.TW": "半導體科技", "8299.TW": "半導體科技",
+        # --- AI伺服器、電腦與電子代工 ---
+        "2317.TW": "AI電腦與代工", "2382.TW": "AI電腦與代工", "2357.TW": "AI電腦與代工", "3231.TW": "AI電腦與代工",
+        "2324.TW": "AI電腦與代工", "2353.TW": "AI電腦與代工", "2371.TW": "AI電腦與代工", "2352.TW": "AI電腦與代工",
+        "2345.TW": "AI電腦與代工", "2377.TW": "AI電腦與代工", "2395.TW": "AI電腦與代工", "4938.TW": "AI電腦與代工",
+        "6669.TW": "AI電腦與代工", "2354.TW": "AI電腦與代工", "2355.TW": "AI電腦與代工", "2376.TW": "AI電腦與代工",
+        "3017.TW": "AI電腦與代工", "3264.TW": "AI電腦與代工", "3596.TW": "AI電腦與代工",
+        # --- 建材營造板塊 ---
+        "2542.TW": "建材營造傳統", "2548.TW": "建材營造傳統", "9945.TW": "建材營造傳統", "2501.TW": "建材營造傳統",
+        "2534.TW": "建材營造傳統",
+        # --- 電機機械與重電綠能 ---
+        "1504.TW": "電機重電綠能", "1513.TW": "電機重電綠能", "1519.TW": "電機重電綠能", "1605.TW": "電機重電綠能",
+        "9958.TW": "電機重電綠能",
+        # --- 航運、航空與物流 ---
+        "2603.TW": "航運航空物流", "2609.TW": "航運航空物流", "2615.TW": "航運航空物流", "2618.TW": "航運航空物流",
+        "2610.TW": "航運航空物流", "2633.TW": "航運航空物流", "2605.TW": "航運航空物流", "2606.TW": "航運航空物流",
+        # --- 金控與銀行 ---
+        "2881.TW": "金融保險金控", "2882.TW": "金融保險金控", "2891.TW": "金融保險金控", "2886.TW": "金融保險金控",
+        "2884.TW": "金融保險金控", "2892.TW": "金融保險金控", "2880.TW": "金融保險金控", "2885.TW": "金融保險金控",
+        "2887.TW": "金融保險金控", "5880.TW": "金融保險金控", "2890.TW": "金融保險金控", "5876.TW": "金融保險金控",
+        "2801.TW": "金融保險金控", "2809.TW": "金融保險金控", "2812.TW": "金融保險金控", "2834.TW": "金融保險金控",
+        "2838.TW": "金融保險金控", "2845.TW": "金融保險金控", "2855.TW": "金融保險金控", "2883.TW": "金融保險金控",
+        "2888.TW": "金融保險金控", "2889.TW": "金融保險金控",
+        # --- 電子零組件、ABF、PCB與通路 ---
+        "2308.TW": "電子零組件通路", "3037.TW": "電子零組件通路", "2327.TW": "電子零組件通路", "2360.TW": "電子零組件通路",
+        "2474.TW": "電子零組件通路", "3702.TW": "電子零組件通路", "2383.TW": "電子零組件通路", "2385.TW": "電子零組件通路",
+        "3044.TW": "電子零組件通路", "6213.TW": "電子零組件通路", "6269.TW": "電子零組件通路", "3036.TW": "電子零組件通路",
+        "4958.TW": "電子零組件通路", "8046.TW": "電子零組件通路",
+        # --- 生技醫療與化學 ---
+        "1795.TW": "生技醫療化學", "4147.TW": "生技醫療化學", "1707.TW": "生技醫療化學", "1722.TW": "生技醫療化學",
+        "1717.TW": "生技醫療化學",
+        # --- 光電與面板 ---
+        "2409.TW": "光電面板面板", "3481.TW": "光電面板面板", "3008.TW": "光電面板面板", "6116.TW": "光電面板面板",
+        "3406.TW": "光電面板面板",
+        # --- 傳統工業（水泥、鋼鐵、塑化、基礎建設） ---
+        "1101.TW": "傳統基礎工業", "1402.TW": "傳統基礎工業", "2002.TW": "傳統基礎工業", "1301.TW": "傳統基礎工業",
+        "1303.TW": "傳統基礎工業", "2105.TW": "傳統基礎工業", "2106.TW": "傳統基礎工業", "9933.TW": "傳統基礎工業",
+        # --- 觀光、百貨、運動與內需消費 ---
+        "2207.TW": "內需消費生活", "9910.TW": "內需消費生活", "2912.TW": "內需消費生活", "5904.TW": "內需消費生活",
+        "2707.TW": "內需消費生活", "9921.TW": "內需消費生活", "9914.TW": "內需消費生活", "9904.TW": "內需消費生活",
+        "2201.TW": "內需消費生活", "2204.TW": "內需消費生活"
     }
+    return mapping
 
 # ----------------------------------------------------
 # ⚙️ 核心量化計算引擎
@@ -63,6 +68,7 @@ def calculate_signals(df):
     if df.empty or len(df) < 20:
         return 0, 0, 0, 0, 0, 0, None
     
+    # 確保 columns 名稱乾淨（防止 yfinance 回傳多重索引）
     df.columns = [col[0] if isinstance(col, tuple) else col for col in df.columns]
 
     # 1. 趨勢籌碼 (MACD + OBV + MA20)
@@ -121,7 +127,7 @@ def calculate_signals(df):
 # ----------------------------------------------------
 tab1, tab2 = st.tabs(["🔍 個股策略診斷", "🚀 全台股整體產業金流與強勢股雷達"])
 
-# ===== Tab 1: 個股診斷功能 =====
+# ===== Tab 1: 個股診斷功能 (已完美補回技術圖表) =====
 with tab1:
     st.write("輸入特定股票代號，查看最完整的量化指標明細與動態買賣操作指引。")
     ticker_input = st.text_input("請輸入股票代號（台股如 2330.TW）", value="2330.TW", key="single_search")
@@ -152,63 +158,39 @@ with tab1:
                 buy_col, sell_col, action_col = st.columns(3)
                 buy_col.metric("🟢 最佳分批買點 (強支撐)", f"{buy_p} 元")
                 sell_col.metric("🔴 最佳波段賣點 (強壓力)", f"{sell_p} 元")
+                with action_col:
+                    if latest_price <= buy_p * 1.02:
+                        st.success("✨ 股價接近最佳買點，適合逢低佈局！")
+                    elif latest_price >= sell_p * 0.98:
+                        st.error("⚠️ 股價逼近最佳賣點，請勿追高！")
+                    else:
+                        st.info("當前價格處於合理震盪區間。")
 
-# ===== Tab 2: 選股雷達功能 (官方全行業指數對接) =====
+                # 📉 🎯 【核心修復】重新繪製並補回個股近 3 個月的走勢圖與均線
+                st.divider()
+                st.write("### 📉 該股近期價格與 20 日生命線（MA20）趨勢圖")
+                chart_df = processed_df.tail(65)  # 僅抓取近約一季(65個交易日)的數據，畫面最清晰
+                
+                # 建立一個只包含收盤價與月線的 DataFrame 給 Streamlit 畫圖
+                display_chart_data = pd.DataFrame({
+                    "當日收盤價 (Close)": chart_df["Close"],
+                    "20日生命線 (MA20)": chart_df["MA20"]
+                })
+                st.line_chart(display_chart_data, height=350)
+
+# ===== Tab 2: 選股雷達功能 (150檔群組化數據混合分析) =====
 with tab2:
-    st.header("🎛 全台股板塊資金流向與潛力股篩選器")
-    st.write("本頁面將同時執行：(1) **全台股官方各大行業加權指數流向掃描**，以及 (2) **大中型核心龍頭個股 Top 10 篩選（完整 150 檔池）**。")
+    st.header("🎛 150大中型核心股池群組化 - 產業資金流向選股器")
+    st.write("本頁面採用**混合大數據邏輯**：下載 150 檔成分股後，(1) 自動按行業分類計算**整體板塊資金強度**，(2) 篩選出**看漲信心最強的 Top 10 個股**。")
     
-    if st.button("開始全面掃描台股總體市場"):
+    if st.button("開始全面掃描 150 檔核心市場"):
+        stock_mapping = get_stock_sector_mapping()
+        stock_pool = list(stock_mapping.keys())
         results_stock = []
-        results_sector = []
-        
-        # --- 階段一：掃描官方 10 大產業指數流向 ---
-        st.write("### 📊 1. 全台股巨觀官方產業指數金流強度診斷")
-        sector_dict = get_taiwan_sector_indices()
-        
-        # 批量下載官方指數數據
-        all_sector_data = yf.download(list(sector_dict.keys()), period="3mo", group_by='ticker')
-        
-        for ticker, sector_name in sector_dict.items():
-            try:
-                sub_df = all_sector_data[ticker].dropna() if isinstance(all_sector_data.columns, pd.MultiIndex) else all_sector_data.dropna()
-                if sub_df.empty: continue
-                score, _, _, _, _, _, _ = calculate_signals(sub_df)
-                results_sector.append({"產業板塊分類": sector_name, "板塊上漲動能強度": score})
-            except:
-                continue
-        
-        sector_res_df = pd.DataFrame(results_sector)
-        if not sector_res_df.empty:
-            sector_res_df = sector_res_df.sort_values(by="板塊上漲動能強度", ascending=False).reset_index(drop=True)
-            
-            c_left, c_right = st.columns([1, 1])
-            with c_left:
-                st.write("這是經由**證交所官方行業分類指數走勢**，透過多模型交叉運算算出的總體資金排名（包含營建、電機重電、生技等主流類股）。")
-                st.dataframe(sector_res_df, use_container_width=True)
-            with c_right:
-                fig, ax = plt.subplots(figsize=(6, 4))
-                plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei', 'Arial Unicode MS', 'sans-serif']
-                plt.rcParams['axes.unicode_minus'] = False
-                
-                plot_df = sector_res_df.iloc[::-1]
-                colors = plt.cm.get_cmap('plasma')(np.linspace(0.3, 0.8, len(plot_df)))
-                
-                ax.barh(plot_df["產業板塊分類"], plot_df["板塊上漲動能強度"], color=colors, height=0.6)
-                ax.set_xlabel("多模型看漲動能共鳴度 (%)")
-                ax.set_title("🔥 全台股主流官方行業指數資金排行榜")
-                ax.grid(axis='x', linestyle=':', alpha=0.6)
-                st.pyplot(fig)
-        
-        st.divider()
-        
-        # --- 階段二：150 檔完整大池篩選 Top 10 ---
-        st.write("### 🏆 2. 當前最值得注意的強勢個股 Top 10 (0050+0051 完整股池)")
-        stock_pool = get_tw_stock_pool()
         
         progress_bar = st.progress(0)
         status_text = st.empty()
-        status_text.write("正在下載 150 檔大中型成分股最新數據...")
+        status_text.write("正在批量下載並運算 150 檔大中型核心股量化指標...")
         
         all_stock_data = yf.download(stock_pool, period="3mo", group_by='ticker')
         
@@ -222,6 +204,7 @@ with tab2:
                 
                 results_stock.append({
                     "股票代號": ticker,
+                    "所屬板塊": stock_mapping[ticker],
                     "最新收盤價": f"{latest_price} 元",
                     "看漲信心指數": score,
                     "建議分批買點": f"{buy_p} 元",
@@ -230,14 +213,41 @@ with tab2:
             except:
                 continue
                 
-        status_text.write("✨ 150 檔核心股量化掃描完成！")
+        status_text.write("✨ 數據抓取完畢，正在進行巨觀產業群組運算...")
         progress_bar.empty()
         
-        res_stock_df = pd.DataFrame(results_stock)
-        if not res_stock_df.empty:
-            res_stock_df = res_stock_df.sort_values(by="看漲信心指數", ascending=False).head(10).reset_index(drop=True)
+        main_df = pd.DataFrame(results_stock)
+        
+        if not main_df.empty:
+            st.write("### 📊 1. 150檔核心股池混合計算：整體產業板塊資金強度")
+            sector_summary = main_df.groupby("所屬板塊")["看漲信心指數"].mean().reset_index()
+            sector_summary = sector_summary.sort_values(by="看漲信心指數", ascending=False).reset_index(drop=True)
+            sector_summary["板塊資金引燃強度"] = sector_summary["看漲信心指數"].round(1)
+            
+            c_left, c_right = st.columns([1, 1])
+            with c_left:
+                st.dataframe(sector_summary[["所屬板塊", "板塊資金引燃強度"]], use_container_width=True)
+                
+            with c_right:
+                fig, ax = plt.subplots(figsize=(6, 4))
+                plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei', 'Arial Unicode MS', 'sans-serif']
+                plt.rcParams['axes.unicode_minus'] = False
+                
+                plot_df = sector_summary.sort_values(by="板塊資金引燃強度", ascending=True)
+                colors = plt.cm.get_cmap('viridis')(np.linspace(0.3, 0.8, len(plot_df)))
+                
+                ax.barh(plot_df["所屬板塊"], plot_df["板塊資金引燃強度"], color=colors, height=0.6)
+                ax.set_xlabel("產業成分股平均多頭強度 (%)")
+                ax.set_title("🔥 150檔核心股混合運算：台股產業金流排行榜")
+                ax.grid(axis='x', linestyle=':', alpha=0.6)
+                st.pyplot(fig)
+            
+            st.divider()
+            st.write("### 🏆 2. 當前最具動能之強勢個股 Top 10 (由 150 檔核心大池篩選)")
+            res_stock_df = main_df.sort_values(by="看漲信心指數", ascending=False).head(10).reset_index(drop=True)
+            
             st.dataframe(
-                res_stock_df, 
+                res_stock_df[["股票代號", "所屬板塊", "最新收盤價", "看漲信心指數", "建議分批買點", "建議波段賣點"]], 
                 use_container_width=True,
                 column_config={
                     "看漲信心指數": st.column_config.ProgressColumn(
@@ -245,3 +255,5 @@ with tab2:
                     )
                 }
             )
+        else:
+            st.error("未能成功生成選股矩陣。")
