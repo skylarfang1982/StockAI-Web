@@ -4,31 +4,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-# ----------------------------------------------------
-# 🎯 [整合新增] 自動抓取中文名稱 (系統啟動時執行)
-# ----------------------------------------------------
-@st.cache_data
-def get_stock_name_map():
-    try:
-        url = "https://isin.twse.com.tw/isin/class_main.jsp?owncode=&stockname=&isincode=&market=1&issuetype=1&industry_code=&Page=1&chklike=Y"
-        df = pd.read_html(url)[0]
-        df = df.iloc[1:, :2]
-        df.columns = ['代號名稱', '其他']
-        mapping = {}
-        for row in df['代號名稱']:
-            parts = str(row).split('\u3000')
-            if len(parts) >= 2:
-                ticker = parts[0].strip() + ".TW"
-                name = parts[1].strip()
-                mapping[ticker] = name
-        return mapping
-    except:
-        return {}
-
-NAME_MAP = get_stock_name_map()
-def get_name(ticker):
-    return NAME_MAP.get(ticker, ticker.replace(".TW", ""))
-
 # 網頁基本設定（寬版模式，有助於手機與電腦端自動調適）
 st.set_page_config(page_title="AI 量化決策與選股系統", layout="wide")
 
@@ -319,7 +294,6 @@ with tab2:
                 latest_price = round(sub_df['Close'].iloc[-1], 1)
                 
                 results_stock.append({
-                    "名稱": get_name(ticker),
                     "代號": ticker,
                     "板塊": stock_mapping[ticker],
                     "現價": latest_price,
@@ -344,11 +318,11 @@ with tab2:
             st.dataframe(sector_summary[["板塊", "強度(%)"]], use_container_width=True)
             
             st.divider()
-            st.write("### 🏆 2. 強勢個股 Top 10")
-            res_stock_df = main_df.sort_values(by="信心", ascending=False).head(10).reset_index(drop=True)
+            st.write("### 🏆 2. 強勢個股 Top 20")
+            res_stock_df = main_df.sort_values(by="信心", ascending=False).head(20).reset_index(drop=True)
             st.dataframe(pd.DataFrame(results_stock), use_container_width=True)
             st.dataframe(
-                res_stock_df[["名稱", "代號", "板塊", "現價", "信心", "買點", "賣點"]], 
+                res_stock_df[["代號", "板塊", "現價", "信心", "買點", "賣點"]], 
                 use_container_width=True,
                 column_config={
                     "信心": st.column_config.ProgressColumn(
