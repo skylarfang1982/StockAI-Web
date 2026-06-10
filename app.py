@@ -62,7 +62,7 @@ def get_stock_sector_mapping():
     return mapping
 
 # ----------------------------------------------------
-# ⚙️ 核心量化計算引擎 (已修正強勢股邏輯邊界)
+# ⚙️ 核心量化計算引擎
 # ----------------------------------------------------
 def calculate_signals(df):
     if df.empty or len(df) < 20:
@@ -114,7 +114,7 @@ def calculate_signals(df):
     positive_signals = [1 for s in [m1_score, m2_score, m3_score] if s == 1]
     confidence_score = int((len(positive_signals) / 3) * 100)
     
-    # 【決策價位優化】
+    # 決策價位優化
     latest_close = df['Close'].iloc[-1]
     recent_low = df['Low'].iloc[-20:].min()
     recent_high = df['High'].iloc[-20:].max()
@@ -122,7 +122,6 @@ def calculate_signals(df):
     best_buy = round(max(df['MA20'].iloc[-1], recent_low), 1)
     best_sell = round(max(latest_close * 1.08, recent_high, df['BB_Upper'].iloc[-1]), 1)
     
-    # 邏輯護欄：買點必低於現價，賣點必高於現價
     if best_buy >= latest_close:
         best_buy = round(latest_close * 0.93, 1)
     if best_sell <= latest_close:
@@ -135,9 +134,21 @@ def calculate_signals(df):
 # ----------------------------------------------------
 tab1, tab2 = st.tabs(["🔍 個股策略診斷", "🚀 全台股整體產業金流與強勢股雷達"])
 
-# ===== Tab 1: 個股診斷功能 (極致專業策略圖) =====
+# ===== Tab 1: 個股診斷功能 =====
 with tab1:
     st.write("輸入特定股票代號，查看最完整的量化指標明細與動態買賣操作指引。")
+    
+    # 🎯 【新增】頂部演算法模型透明化揭露
+    with st.expander("ℹ️ 查看後台量化決策模型架構與計分權重機制", expanded=True):
+        st.markdown("""
+        本系統採用**三模組多重共鳴投票算法 (Multi-Model Voting Engine)**，看漲信心度由以下三個經典量化模型共同決策：
+        1. **📈 趨勢與量能模型 (Model 1)：** 結合 **MACD 柱狀體翻紅** + **OBV 能量潮超越5日均線** + **收盤價高於20日生命線(MA20)**。符合得 1 票。
+        2. **⚡ 動能與反轉模型 (Model 2)：** 監控 **KD 指標黃金交叉** 且 **RSI 強勢動能大於 45**。符合得 1 票。
+        3. **🌌 波動與突破模型 (Model 3)：** 監控 **布林通道 (Bollinger Bands)** 邊界，當股價**強勢帶量突破上軌**時觸發多頭動能信號。符合得 1 票。
+        
+        *※ 決策計分：3票全通過 = **100% (強烈建議買入)** / 2票通過 = **66% (偏多續抱)** / 1票通過 = **33% (弱勢觀望)**。*
+        """)
+
     ticker_input = st.text_input("請輸入股票代號（台股如：2330.TW、2603.TW）", value="2330.TW")
     
     btn_col1, btn_col2 = st.columns([1, 4])
@@ -201,7 +212,6 @@ with tab1:
 
         st.divider()
         
-        # 控制圖表開關按鈕
         if st.session_state.show_chart:
             if st.button("👁️ 隱藏技術對照圖表"):
                 st.session_state.show_chart = False
@@ -211,7 +221,6 @@ with tab1:
                 st.session_state.show_chart = True
                 st.rerun()
 
-        # 專業技術圖表繪製區
         if st.session_state.show_chart:
             chart_df = data["chart_df"]
             buy_p = data["buy_p"]
@@ -221,15 +230,12 @@ with tab1:
             plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei', 'Arial Unicode MS', 'sans-serif']
             plt.rcParams['axes.unicode_minus'] = False
             
-            # 主線：收盤價與生命線
             ax.plot(chart_df.index, chart_df['Close'], label='當日收盤價 (Close)', color='#1f77b4', linewidth=2.5)
             ax.plot(chart_df.index, chart_df['MA20'], label='20日生命線 (MA20)', color='#ff7f0e', linestyle='--', linewidth=1.8)
             
-            # 策略水平輔助線
             ax.axhline(y=buy_p, color='#2ca02c', linestyle=':', linewidth=2, label=f'最佳分批買點 ({buy_p}元)')
             ax.axhline(y=sell_p, color='#d62728', linestyle=':', linewidth=2, label=f'最佳波段賣點 ({sell_p}元)')
             
-            # 圖表美化
             ax.set_title(f"📈 {ticker_input} 技術趨勢與量化策略價位對照表", fontsize=13, fontweight='bold', pad=15)
             ax.set_xlabel("交易日期", fontsize=10)
             ax.set_ylabel("價格 (新台幣元)", fontsize=10)
@@ -241,7 +247,18 @@ with tab1:
 # ===== Tab 2: 選股雷達功能 =====
 with tab2:
     st.header("🎛 150大中型核心股池群組化 - 產業資金流向選股器")
-    st.write("本頁面採用**混合大數據邏輯**：下載 150 檔成分股後，自動按行業分類計算並顯示數據報表。")
+    
+    # 🎯 【新增】第二頁頂部混合計算邏輯明細揭露
+    with st.expander("ℹ️ 查看 150 檔大數據混合計算與產業資金引燃強度運算邏輯", expanded=True):
+        st.markdown("""
+        本頁面結合**宏觀板塊金流**與**微觀強勢股篩選**，後台混合運算邏輯如下：
+        1. **📊 整體產業板塊資金強度計算：** 下載 150 檔核心股的歷史數據並計算各自的信心分數後，按所屬板塊分類。
+           $$\text{板塊資金引燃強度 (\%)} = \frac{\text{該板塊內所有個股信心指數總和}}{\text{該板塊內總個股數量}}$$
+           *若強度接近 0%，代表該產業整體技術面全面轉弱或資金全面流出；若大於 70%，代表具備高凝聚力的族群群體上攻效應。*
+        2. **🏆 強勢個股 Top 10 篩選：** 從 150 檔大池中直接排序，撈取多模組投票獲得 **100% (3票全過)** 或 **66% (2票通過)** 的前 10 檔最具爆發力個股。
+        """)
+        
+    st.write("點擊下方按鈕開始批量下載並群組化排序 150 檔台股市場核心標的。")
     
     if st.button("開始全面掃描 150 檔核心市場"):
         stock_mapping = get_stock_sector_mapping()
@@ -282,7 +299,7 @@ with tab2:
             st.write("### 📊 1. 150檔核心股池混合計算：整體產業板塊資金強度")
             sector_summary = main_df.groupby("所屬板塊")["看漲信心指數"].mean().reset_index()
             sector_summary = sector_summary.sort_values(by="看漲信心指數", ascending=False).reset_index(drop=True)
-            sector_summary["板塊資金引燃強度 (%)"] = sector_summary["看漲信心指數"].round(1)
+            sector_summary["板塊資金引燃強度 (%)"] = sector_summary["看勢信心指數" if "看勢信心指數" in sector_summary else "看漲信心指數"].round(1)
             
             st.dataframe(sector_summary[["所屬板塊", "板塊資金引燃強度 (%)"]], use_container_width=True)
             
