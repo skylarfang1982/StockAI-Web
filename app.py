@@ -346,9 +346,9 @@ with tab2:
             st.divider()
             st.write("### 🏆 2. 強勢個股 Top 10")
             res_stock_df = main_df.sort_values(by="信心", ascending=False).head(10).reset_index(drop=True)
-            
+            st.dataframe(pd.DataFrame(results_stock), use_container_width=True)
             st.dataframe(
-                res_stock_df[["代號", "板塊", "現價", "信心", "買點", "賣點"]], 
+                res_stock_df[["名稱", "代號", "板塊", "現價", "信心", "買點", "賣點"]], 
                 use_container_width=True,
                 column_config={
                     "信心": st.column_config.ProgressColumn(
