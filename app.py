@@ -124,14 +124,16 @@ if st.button("啟動多模型交叉分析"):
                 st.write("**3. 波動突破流 (布林通道)**")
                 st.write("🟢 帶量突破上軌 (強勢股)" if m3_score == 1 else ("🔴 跌破下軌 (弱勢格局)" if m3_score == -1 else "🟡 通道內震盪"))
 
-            # 歷史K線與布林通道圖表
-            st.write("### 📈 波動度通道走勢圖")
-            fig, ax = plt.subplots(figsize=(14, 5))
-            ax.plot(df['Close'], label='收盤價', color='black', alpha=0.7)
-            ax.plot(df['BB_Upper'], label='布林上軌 (壓力線)', color='red', linestyle='--', alpha=0.5)
-            ax.plot(df['BB_Middle'], label='布林中軌 (月線)', color='orange', alpha=0.5)
-            ax.plot(df['BB_Lower'], label='布林下軌 (支撐線)', color='green', linestyle='--', alpha=0.5)
-            ax.fill_between(df.index, df['BB_Upper'], df['BB_Lower'], color='gray', alpha=0.05)
-            ax.legend(loc='upper left')
-            ax.grid(True, alpha=0.2)
-            st.pyplot(fig)
+st.divider()
+
+            # 🛠 使用 st.expander 隱藏圖表，點擊才展開
+            with st.expander("📊 點擊查看歷史 K 線與波動度通道走勢圖 (布林通道)"):
+                fig, ax = plt.subplots(figsize=(14, 5))
+                ax.plot(df['Close'], label='收盤價', color='black', alpha=0.7)
+                ax.plot(df['BB_Upper'], label='布林上軌 (壓力線)', color='red', linestyle='--', alpha=0.5)
+                ax.plot(df['BB_Middle'], label='布林中軌 (月線)', color='orange', alpha=0.5)
+                ax.plot(df['BB_Lower'], label='布林下軌 (支撐線)', color='green', linestyle='--', alpha=0.5)
+                ax.fill_between(df.index, df['BB_Upper'], df['BB_Lower'], color='gray', alpha=0.05)
+                ax.legend(loc='upper left')
+                ax.grid(True, alpha=0.2)
+                st.pyplot(fig)
