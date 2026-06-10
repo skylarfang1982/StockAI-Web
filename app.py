@@ -320,7 +320,9 @@ with tab2:
             st.divider()
             st.write("### 🏆 2. 強勢個股 Top 20")
             res_stock_df = main_df.sort_values(by="信心", ascending=False).head(20).reset_index(drop=True)
-            st.dataframe(pd.DataFrame(results_stock), use_container_width=True)
+            # 第一段：這裡直接輸出全部結果，沒有經過篩選
+            # == st.dataframe(pd.DataFrame(results_stock), use_container_width=True)
+            # 第二段：這裡才是你想要的 Top 20 篩選結果
             st.dataframe(
                 res_stock_df[["代號", "板塊", "現價", "信心", "買點", "賣點"]], 
                 use_container_width=True,
