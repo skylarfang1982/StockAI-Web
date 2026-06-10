@@ -5,8 +5,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # 網頁基本設定
-st.set_page_config(page_title="AI 量化決策與選股系統", layout="wide")
-st.title("🔮 多模型 AI 綜合決策系統")
+st.set_page_config(page_title="AI 股市量化決策與選股系統", layout="wide")
+st.title("🔮 多模型 AI 股市綜合決策系統")
 
 # ----------------------------------------------------
 # 🗂 150檔核心股池 與 其所屬產業板塊 完美映射字典
@@ -62,7 +62,7 @@ def get_stock_sector_mapping():
     return mapping
 
 # ----------------------------------------------------
-# ⚙️ 核心量化計算引擎
+# ⚙️ 核心量化計算引擎 (已修正強勢股邏輯邊界)
 # ----------------------------------------------------
 def calculate_signals(df):
     if df.empty or len(df) < 20:
@@ -114,17 +114,15 @@ def calculate_signals(df):
     positive_signals = [1 for s in [m1_score, m2_score, m3_score] if s == 1]
     confidence_score = int((len(positive_signals) / 3) * 100)
     
-    # 🎯 【防錯升級邏輯】
+    # 【決策價位優化】
     latest_close = df['Close'].iloc[-1]
     recent_low = df['Low'].iloc[-20:].min()
     recent_high = df['High'].iloc[-20:].max()
     
-    # 最佳買點：如果是強勢股，回檔到 MA20 或布林中線附近就是好買點，若跌破近期最低則防守
     best_buy = round(max(df['MA20'].iloc[-1], recent_low), 1)
-    # 最佳賣點：動態向外推，必須高於當前收盤價與近期最高價，採用 1.1 倍或布林上軌最大值
     best_sell = round(max(latest_close * 1.08, recent_high, df['BB_Upper'].iloc[-1]), 1)
     
-    # 防呆確認：確保買點一定低於現價，賣點一定高於現價
+    # 邏輯護欄：買點必低於現價，賣點必高於現價
     if best_buy >= latest_close:
         best_buy = round(latest_close * 0.93, 1)
     if best_sell <= latest_close:
@@ -137,7 +135,7 @@ def calculate_signals(df):
 # ----------------------------------------------------
 tab1, tab2 = st.tabs(["🔍 個股策略診斷", "🚀 全台股整體產業金流與強勢股雷達"])
 
-# ===== Tab 1: 個股診斷功能 =====
+# ===== Tab 1: 個股診斷功能 (極致專業策略圖) =====
 with tab1:
     st.write("輸入特定股票代號，查看最完整的量化指標明細與動態買賣操作指引。")
     ticker_input = st.text_input("請輸入股票代號（台股如：2330.TW、2603.TW）", value="2330.TW")
@@ -203,6 +201,7 @@ with tab1:
 
         st.divider()
         
+        # 控制圖表開關按鈕
         if st.session_state.show_chart:
             if st.button("👁️ 隱藏技術對照圖表"):
                 st.session_state.show_chart = False
@@ -212,26 +211,30 @@ with tab1:
                 st.session_state.show_chart = True
                 st.rerun()
 
+        # 專業技術圖表繪製區
         if st.session_state.show_chart:
             chart_df = data["chart_df"]
             buy_p = data["buy_p"]
             sell_p = data["sell_p"]
             
-            fig, ax = plt.subplots(figsize=(10, 4))
+            fig, ax = plt.subplots(figsize=(10, 4.5))
             plt.rcParams['font.sans-serif'] = ['Microsoft JhengHei', 'Arial Unicode MS', 'sans-serif']
             plt.rcParams['axes.unicode_minus'] = False
             
-            ax.plot(chart_df.index, chart_df['Close'], label='當日收盤價', color='#1f77b4', linewidth=2)
-            ax.plot(chart_df.index, chart_df['MA20'], label='20日生命線 (MA20)', color='#ff7f0e', linestyle='--')
+            # 主線：收盤價與生命線
+            ax.plot(chart_df.index, chart_df['Close'], label='當日收盤價 (Close)', color='#1f77b4', linewidth=2.5)
+            ax.plot(chart_df.index, chart_df['MA20'], label='20日生命線 (MA20)', color='#ff7f0e', linestyle='--', linewidth=1.8)
             
-            ax.axhline(y=buy_p, color='green', linestyle=':', linewidth=1.5, label=f'最佳分批買點 ({buy_p}元)')
-            ax.axhline(y=sell_p, color='red', linestyle=':', linewidth=1.5, label=f'最佳波段賣點 ({sell_p}元)')
+            # 策略水平輔助線
+            ax.axhline(y=buy_p, color='#2ca02c', linestyle=':', linewidth=2, label=f'最佳分批買點 ({buy_p}元)')
+            ax.axhline(y=sell_p, color='#d62728', linestyle=':', linewidth=2, label=f'最佳波段賣點 ({sell_p}元)')
             
-            ax.set_title(f"{ticker_input} 技術趨勢與量化買賣點對照", fontsize=11, fontweight='bold')
-            ax.set_xlabel("日期")
-            ax.set_ylabel("價格 (元)")
-            ax.legend(loc='upper left')
-            ax.grid(True, linestyle=':', alpha=0.6)
+            # 圖表美化
+            ax.set_title(f"📈 {ticker_input} 技術趨勢與量化策略價位對照表", fontsize=13, fontweight='bold', pad=15)
+            ax.set_xlabel("交易日期", fontsize=10)
+            ax.set_ylabel("價格 (新台幣元)", fontsize=10)
+            ax.legend(loc='upper left', frameon=True, facecolor='white', framealpha=0.9)
+            ax.grid(True, linestyle=':', alpha=0.5)
             
             st.pyplot(fig)
 
@@ -249,7 +252,6 @@ with tab2:
         status_text = st.empty()
         status_text.write("正在批量下載並運算 150 檔大中型核心股量化指標...")
         
-        # 🎯 這裡同步將選股下載長度拉長到 1 年 (1y)，避免短週期指標失真
         all_stock_data = yf.download(stock_pool, period="1y", group_by='ticker')
         
         for idx, ticker in enumerate(stock_pool):
