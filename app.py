@@ -5,8 +5,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # 網頁基本設定
-st.set_page_config(page_title="多模型股市決策系統", layout="wide")
-st.title("🔮 多模型 AI 股市綜合決策系統")
+st.set_page_config(page_title="多模型決策系統", layout="wide")
+st.title("🔮 多模型 AI 綜合決策系統")
 st.write("本系統同時運算【趨勢、動能、波動度】三大獨立量化模型，並動態估算當前最佳動態買賣點。")
 
 # 網頁格子輸入元件
